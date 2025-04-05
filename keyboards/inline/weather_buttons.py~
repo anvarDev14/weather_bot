@@ -1,0 +1,17 @@
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+def get_advertising_keyboard():
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton("Отправить", callback_data="send_ad_now"),
+        InlineKeyboardButton("Отправить позже", callback_data="send_ad_later")
+    )
+    return keyboard
+
+def get_ad_control_keyboard():
+    keyboard = InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        InlineKeyboardButton("Остановить", callback_data="stop_ad"),
+        InlineKeyboardButton("Продолжать", callback_data="continue_ad")
+    )
+    return keyboard

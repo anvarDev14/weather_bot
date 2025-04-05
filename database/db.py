@@ -1,0 +1,84 @@
+import sqlite3
+
+class Database:
+    def __init__(self, db_file="users.db"):
+        self.conn = sqlite3.connect(db_file, check_same_thread=False)
+        self.cursor = self.conn.cursor()
+        self.create_table()
+        self.add_language_column()
+        self.add_is_admin_column()
+
+    def create_table(self):
+        print("Creating or verifying users table")
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER UNIQUE,
+                username TEXT,
+                join_date TEXT,
+                location TEXT,
+                language TEXT DEFAULT 'uz',
+                is_admin INTEGER DEFAULT 0
+            )
+        """)
+        self.conn.commit()
+
+    def add_language_column(self):
+        try:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'uz'")
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+    def add_is_admin_column(self):
+        try:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+    def add_user(self, user_id, username, join_date, location="Moscow", language="uz"):
+        print(f"Adding user {user_id} to database")
+        self.cursor.execute("INSERT OR IGNORE INTO users (user_id, username, join_date, location, language, is_admin) VALUES (?, ?, ?, ?, ?, 0)",
+                           (user_id, username, join_date, location, language))
+        self.conn.commit()
+
+    def user_exists(self, user_id):
+        self.cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        return bool(self.cursor.fetchone())
+
+    def select_all_users(self):
+        print("Selecting all users from database")
+        self.cursor.execute("SELECT id, user_id FROM users")
+        result = self.cursor.fetchall()
+        print(f"Users fetched: {result}")
+        return result
+
+    def select_user(self, telegram_id):
+        self.cursor.execute("SELECT id, user_id FROM users WHERE user_id = ?", (telegram_id,))
+        return self.cursor.fetchone()
+
+    def check_if_admin(self, user_id):
+        self.cursor.execute("SELECT is_admin FROM users WHERE user_id = ?", (user_id,))
+        result = self.cursor.fetchone()
+        return bool(result[0]) if result else False
+
+    def get_user_location(self, user_id):
+        self.cursor.execute("SELECT location FROM users WHERE user_id = ?", (user_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result else "Moscow"
+
+    def update_location(self, user_id, location):
+        self.cursor.execute("UPDATE users SET location = ? WHERE user_id = ?", (location, user_id))
+        self.conn.commit()
+
+    def get_user_language(self, user_id):
+        self.cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
+        result = self.cursor.fetchone()
+        return result[0] if result else "uz"
+
+    def update_language(self, user_id, language):
+        self.cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (language, user_id))
+        self.conn.commit()
+
+user_db = Database()

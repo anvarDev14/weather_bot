@@ -1,0 +1,45 @@
+from aiogram import Dispatcher, types
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters import CommandStart
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from keyboards.default.menu import get_main_menu
+from database.db import db
+from utils.weather import get_weather
+import datetime
+
+
+class UserStates(StatesGroup):
+    waiting_city = State()
+
+
+def setup(dp: Dispatcher):
+    @dp.message_handler(CommandStart())
+    async def start_command(message: types.Message):
+        user_id = message.from_user.id
+        username = message.from_user.username or "NoUsername"
+        join_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        db.add_user(user_id, username, join_date)
+        from handlers.notifications import notify_admin_new_user
+        await notify_admin_new_user(dp.bot, user_id, username)
+
+        await message.answer("Привет! Я погодный бот.", reply_markup=get_main_menu())
+
+    @dp.message_handler(lambda message: message.text == "Погода сейчас")
+    async def weather_now(message: types.Message):
+        city = db.get_user_location(message.from_user.id)
+        weather = await get_weather(city)
+        await message.answer(weather)
+
+    @dp.message_handler(lambda message: message.text == "Изменить город")
+    async def change_city(message: types.Message):
+        await message.answer("Введите название города:")
+        await UserStates.waiting_city.set()
+
+    @dp.message_handler(state=UserStates.waiting_city)
+    async def process_city(message: types.Message, state: FSMContext):
+        city = message.text
+        db.update_location(message.from_user.id, city)
+        weather = await get_weather(city)
+        await message.answer(f"Город изменен на {city}. {weather}", reply_markup=get_main_menu())
+        await state.finish()

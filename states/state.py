@@ -1,0 +1,2 @@
+
+ad_status = "stopped"

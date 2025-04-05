@@ -1,18 +1,18 @@
-from aiogram import executor
+from aiogram import Bot, Dispatcher, executor
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from data.config import BOT_TOKEN
+from handlers import users, admin, notifications, userss
 
-from loader import dp
-import middlewares, filters, handlers
-from utils.notify_admins import on_startup_notify
-from utils.set_bot_commands import set_default_commands
+bot = Bot(token=BOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
+# Подключаем обработчики
+userss.setup(dp)
+admin.setup(dp)
 
-async def on_startup(dispatcher):
-    # Birlamchi komandalar (/star va /help)
-    await set_default_commands(dispatcher)
+async def on_startup(_):
+    print("Бот запущен!")
 
-    # Bot ishga tushgani haqida adminga xabar berish
-    await on_startup_notify(dispatcher)
-
-
-if __name__ == '__main__':
-    executor.start_polling(dp, on_startup=on_startup)
+if __name__ == "__main__":
+    executor.start_polling(dp, skip_updates=True, on_startup=on_startup)

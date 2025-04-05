@@ -1,0 +1,6 @@
+from aiogram import Bot
+from data.config import ADMINS
+
+async def notify_admin_new_user(bot: Bot, user_id: int, username: str):
+    for admin in ADMINS:
+        await bot.send_message(admin, f"Новый пользователь: @{username} (ID: {user_id})")

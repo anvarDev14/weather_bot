@@ -1,0 +1,29 @@
+import aiohttp
+from data.config import WEATHER_API_KEY
+
+async def get_weather(city: str):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_API_KEY}&units=metric&lang=ru"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                temp = data["main"]["temp"]
+                feels_like = data["main"]["feels_like"]
+                desc = data["weather"][0]["description"]
+                return f"Погода в {city}: {temp}°C (ощущается как {feels_like}°C), {desc}"
+            return f"Не удалось найти погоду для {city}. Проверьте название города."
+
+async def get_weekly_forecast(city: str):
+    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&appid={WEATHER_API_KEY}&units=metric&lang=ru"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            if response.status == 200:
+                data = await response.json()
+                forecast = []
+                for item in data["list"][::8]:  # Берем данные раз в день (каждые 8 записей = 24 часа)
+                    date = item["dt_txt"].split(" ")[0]
+                    temp = item["main"]["temp"]
+                    desc = item["weather"][0]["description"]
+                    forecast.append(f"{date}: {temp}°C, {desc}")
+                return "\n".join(forecast)
+            return f"Не удалось найти прогноз для {city}."
