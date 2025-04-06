@@ -4,12 +4,19 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from keyboards.default.menu import get_language_keyboard, get_main_menu_uz, get_main_menu_ru
 from database.db import user_db
 from utils.weather import get_weather, get_weather_by_location, get_weekly_forecast
+from utils.advertising import Advertisement  # Импорт класса Advertisement
 import datetime
+import asyncio
+
+# Список администраторов (можно вынести в config.py)
+ADMINS = [6369838846]  # Ваш Telegram ID
 
 
+# Состояния FSM
 class UserStates(StatesGroup):
     waiting_city = State()
     waiting_language = State()
+    waiting_ad_content = State()  # Для ввода текста рекламы
 
 
 def setup(dp: Dispatcher):
@@ -19,7 +26,6 @@ def setup(dp: Dispatcher):
         username = message.from_user.username or "NoUsername"
         join_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Проверяем, есть ли пользователь в базе
         if not user_db.user_exists(user_id):
             user_db.add_user(user_id, username, join_date)
             from handlers.notifications import notify_admin_new_user
@@ -29,15 +35,13 @@ def setup(dp: Dispatcher):
                                  reply_markup=get_language_keyboard())
             await UserStates.waiting_language.set()
         else:
-            # Если пользователь уже есть, проверяем его язык
             language = user_db.get_user_language(user_id)
-            if language not in ["uz", "ru"]:  # Если язык не установлен или некорректен
+            if language not in ["uz", "ru"]:
                 print(f"User {user_id} has no valid language, asking for language")
                 await message.answer("Iltimos, tilni tanlang / Пожалуйста, выберите язык:",
                                      reply_markup=get_language_keyboard())
                 await UserStates.waiting_language.set()
             else:
-                # Если язык уже есть, показываем меню
                 print(f"User {user_id} already has language {language}, showing main menu")
                 welcome_text = "Xush kelibsiz! Men ob-havo botiman." if language == "uz" else "Добро пожаловать! Я бот погоды."
                 keyboard = get_main_menu_uz() if language == "uz" else get_main_menu_ru()
@@ -113,3 +117,35 @@ def setup(dp: Dispatcher):
         await message.answer("Iltimos, tilni tanlang / Пожалуйста, выберите язык:",
                              reply_markup=get_language_keyboard())
         await UserStates.waiting_language.set()
+
+    # Команда /reklama
+    @dp.message_handler(commands=["reklama"])
+    async def reklama_handler(message: types.Message):
+        user_id = message.from_user.id
+        if user_id not in ADMINS:
+            language = user_db.get_user_language(user_id)
+            await message.reply("Sizda ruxsat yo'q." if language == "uz" else "У вас нет прав.")
+            return
+        language = user_db.get_user_language(user_id)
+        await message.reply("Reklama matnini yuboring:" if language == "uz" else "Отправьте текст рекламы:")
+        await UserStates.waiting_ad_content.set()
+
+    # Обработка текста рекламы
+    @dp.message_handler(state=UserStates.waiting_ad_content)
+    async def process_ad_content(message: types.Message, state: FSMContext):
+        user_id = message.from_user.id
+        if user_id not in ADMINS:
+            language = user_db.get_user_language(user_id)
+            await message.reply("Sizda ruxsat yo'q." if language == "uz" else "У вас нет прав.")
+            await state.finish()
+            return
+
+        ad_text = message.text
+        ad_id = len([ad for ad in dir() if "advertisement" in ad.lower()]) + 1  # Простой счетчик для ID
+        advertisement = Advertisement(ad_id=ad_id, message=ad_text, ad_type="ad_type_text", bot=dp.bot,
+                                      creator_id=user_id)
+        language = user_db.get_user_language(user_id)
+        await message.reply(
+            f"Reklama #{ad_id} jadvalga qo'shildi." if language == "uz" else f"Реклама #{ad_id} добавлена в расписание.")
+        await asyncio.create_task(advertisement.start())
+        await state.finish()
